@@ -1,12 +1,25 @@
 (****************************************************************
+ * Type definitions *********************************************)
+exception No_next_word
+
+type word = string 
+type word_occurrence = int
+
+type bank = 
+  | WordBank of bank Trie.StringTrie.trie * word list * word_occurrence
+
+
+(****************************************************************
  * Utils ********************************************************)
 
 let (|>) a b = b a
 
+let print_string_list string_list = 
+  List.iter (fun s -> Printf.printf "--> %s\n" s) string_list
+
 let sentence_from_paragraph para =
   let regexp = Str.regexp "[.?!] " in
   let breaker = "...Next.Sentence..." in
-  let replacement_fun s = s ^ breaker in
   Str.global_replace regexp ("\\0" ^ breaker) para
   |> Str.split (Str.regexp (" " ^ breaker))
 
@@ -37,41 +50,100 @@ let rec break_into_word_segments word_input n = match word_input with
       (take word_input n) :: (break_into_word_segments words n)
   end
 
+let rec take n words = 
+  if n = 0 then [] else
+  match words with
+  | [] -> []
+  | w :: ws -> w :: (take (n-1) ws)
+
+let take_random_el_from_list el_list =
+  List.nth el_list (Random.int (List.length el_list))
 
 
 (****************************************************************
  * Functionality ************************************************)
 
-type word = string list
+let empty () = WordBank(Trie.StringTrie.empty (), [], 0)
 
-type bank = 
-  | WordBank of bank Trie.StringTrie.trie * word list
+let root_bank = ref (empty ())
+let reset_bank () = root_bank := (empty ())
 
-let empty () = WordBank(Trie.StringTrie.empty (), [])
+(*
+ * What is stored in the trie?
+ * - Bank for subsequent words
+ * - The number of times that particular word occurred
+ * - A list of the most popular next words
+ *)
+let most_popular_words trie =
+  let open List in
+  let bank_list = Trie.StringTrie.to_list trie in
+  let word_fn = fun (word, WordBank(_trie, _words, count)) -> (word, count) in
+  let word_list = map word_fn bank_list in
+  let sort_fn = fun (_w1, c1) (_w2, c2) -> 
+    if c1 = c2 then 0 else
+    if c1 > c2 then 1 else -1
+  in
+  let sorted_word_tuples = sort sort_fn word_list in
+  let top_word_tuples = take 2 sorted_word_tuples in
+  map (fun (word, _count) -> word) top_word_tuples
 
-(* FIXME: Doesn't compile, and doesn't make sense *)
-let rec get bank sequence = match sequence with
+let rec update_along_path bank sequence = 
+  match sequence with
   | [] -> bank
   | w::ws -> 
-      let (count, next_bank) = Trie.StringTrie.get bank w in
-      get next_bank ws
+      let WordBank(trie, _words, count) = bank in
+      let next_bank = begin
+        try Trie.StringTrie.get trie w
+        with Not_found -> empty ()
+      end in
+      let new_bank = update_along_path next_bank ws in
+      let new_trie = Trie.StringTrie.set trie w new_bank in
+      let new_words = most_popular_words new_trie in
+      WordBank(new_trie, new_words, count + 1)
 
-let update_for_sequence bank sequence =
-  (* break_into_word_segments sequence 5
-  |> List.iter (fun words ->
-      let existing_value 
-      (* Get the existing value *)*)
-      
+let update_for_sequence sequence =
+  break_into_word_segments sequence Config.word_depth
+  |> List.iter (fun words -> root_bank := update_along_path !root_bank words)
 
-  Printf.printf "Printing from one para:\n";
-  List.iter (fun s -> Printf.printf "Training with '%s'\n" s) s
-
-let train bank text = 
+let train text = 
   let paras = para_from_text text in
   let material = List.fold_left (fun a p -> (words_list_from_text p) :: a) [] paras in
-  List.iter (fun s -> update_for_sequence bank s) material
+  List.iter (fun s -> update_for_sequence s) material
 
-  
+let rec get_next_word bank words =
+  match words with
+  | [] -> 
+      let WordBank(_trie, words, _count) = bank in
+      take_random_el_from_list words
+  | w::ws -> 
+      let WordBank(trie, _words, _count) = bank in
+      let next_bank = Trie.StringTrie.get trie w in
+      get_next_word next_bank ws
+
+let predict_next_word words = 
+  let open List in
+  let rec get_words = function
+    | [] -> raise No_next_word
+    | w::ws ->
+        try get_next_word !root_bank (w::ws)
+        with Not_found -> get_words ws in
+  let checkable_words = rev (take (Config.word_depth - 1) (rev words))
+  in
+  get_words checkable_words
+
+let predict_next n text =
+  let rec get_n_words n words = match n with
+    | 0 -> []
+    | _ -> begin
+        let next_word = predict_next_word words in
+        let new_words = words @ [next_word] in
+        next_word :: (get_n_words (n-1) new_words)
+    end
+  in
+  let words_as_list = words_list_from_text text in
+  let predicted_words = get_n_words n words_as_list in
+  String.concat " " predicted_words
+
 
 (****************************************************************
  * Tests ********************************************************)
@@ -102,9 +174,33 @@ let testBreakWordsIntoInsertableElements () =
   assert (e = ["kjaere";"mennesker"]);
   assert (f = ["mennesker"])
 
+let testUpdateAlongPath () =
+  let text = ["text"] in
+  let new_bank = update_along_path (empty ()) text in
+  let WordBank(_, words, count) = new_bank in
+  assert (words = ["text"]);
+  assert (count = 1);
+  let more_text = ["text";"more"] in
+  let newer_bank = update_along_path new_bank more_text in
+  let WordBank(_, words, count) = newer_bank in
+  assert (words = ["text"]);
+  assert (count = 2);
+  Printf.printf "WriteWithMeTraining test passed.\n%!"
+
+let testTrainPredictNextWord () =
+  let text = "my friend is best" in
+  train text;
+  let next_word = predict_next 1 "my friend is" in
+  assert (next_word = "best");
+  let next_words = predict_next 2 "my friend" in
+  assert (next_words = "is best");
+  Printf.printf "PredictNextWord test passed.\n%!"
+
 let test () =
   testTextTransformations ();
-  testBreakWordsIntoInsertableElements ()
+  testBreakWordsIntoInsertableElements ();
+  testUpdateAlongPath ();
+  testTrainPredictNextWord ()
 
 let runAllTests () = 
   Trie.test ();
@@ -112,8 +208,3 @@ let runAllTests () =
 
 let _ = 
   runAllTests ();
-  let text = "This is my text! I love it, and I think everyone should know what it is like
-      to train a writewithme program!" in
-  let bank = empty () in
-  train bank text
-
