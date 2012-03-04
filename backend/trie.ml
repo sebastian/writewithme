@@ -84,7 +84,7 @@ module MakeTrie (Trie : TrieSig) = struct
       let Point(value, children) = trie in
       let mapped_value = (match value with
         | None -> None
-        | Value v -> Value(fn ((from_list acc_key), v))) in
+        | Value v -> Value(fn ((Trie.from_list acc_key), v))) in
       let mapped_children = map (fun (k, nt) -> (k, mapper fn nt (k :: acc_key))) children in
       Point(mapped_value, mapped_children) in
     mapper fn trie []
@@ -95,6 +95,23 @@ module MakeTrie (Trie : TrieSig) = struct
       | [] -> trie
       | (k,v)::rest -> adder (set trie k v) rest in
     adder trie key_value_list
+
+  let fold fn init_acc trie =
+    let rec folder acc trie acc_key =
+      let Point(value, children) = trie in
+      let new_acc = (match value with
+        | None -> acc
+        | Value v -> (fn acc ((Trie.from_list acc_key), v))) in
+      let fold_fn a el = 
+        let (k, nt) = el in
+        folder a nt (k :: acc_key) in
+      fold_left fold_fn new_acc children
+    in
+    folder init_acc trie []
+
+  let to_list trie =
+    let fold_fn a value = value :: a in
+    fold fold_fn [] trie
 end
 
 module StringTrieFunctionality = struct
@@ -136,11 +153,27 @@ let testGetSetStringTrie () =
 
 let testMap () =
   let trie = StringTrie.from_list [("a", 1);("b", 2)] in
-  let mapped_trie = (StringTrie.map (fun (k,v) -> v+1) trie) in
+  let mapped_trie = (StringTrie.map (fun (_k,v) -> v+1) trie) in
   assert ((StringTrie.get mapped_trie "a") = 2);
   assert ((StringTrie.get mapped_trie "b") = 3);
   Printf.printf "All StringTrie map tests passed\n"
 
+let testFold () =
+  let trie = StringTrie.from_list [("a", 1);("b", 2)] in
+  let fold_fn a (_k,v) = a + v in
+  let value = StringTrie.fold fold_fn 0 trie in
+  assert (value = 3);
+  Printf.printf "All StringTrie fold tests passed\n"
+
+let testToList () =
+  let original_list = [("a", 1);("b", 2)] in 
+  let trie = StringTrie.from_list original_list in
+  let created_list = StringTrie.to_list trie in
+  assert (original_list = created_list);
+  Printf.printf "All StringTrie to_list tests passed\n"
+
 let test () =
   testGetSetStringTrie ();
-  testMap ()
+  testMap ();
+  testFold ();
+  testToList ()
