@@ -30,16 +30,15 @@ module MakeTrie (Trie : TrieSig) = struct
   (* Creates a new and empty trie *)
   let empty () = Point (None, [])
 
-  (* Add a new element to a trie
+  (* Sets a new element to a trie
    * It requires that the key is an enumerable
    *)
   let find_child key_comp children =
     try find (fun (k, _) -> k = key_comp) children
     with Not_found -> (key_comp, empty ())
 
-
   (* adds a new element to the trie *)
-  let rec trie_add trie lookup_key new_value = 
+  let rec trie_set trie lookup_key new_value = 
     let Point(value, children) = trie in
     match lookup_key with
     | [] -> Point(Value(new_value), children)
@@ -50,14 +49,13 @@ module MakeTrie (Trie : TrieSig) = struct
           | _ -> true
         ) children in
         let new_children = 
-            (key, trie_add next_child keys new_value) 
+            (key, trie_set next_child keys new_value) 
             :: other_subchildren in
         Point(value, new_children)
 
-  let add trie key new_value = 
+  let set trie key new_value = 
     let lookup_key = to_list key in
-    trie_add trie lookup_key new_value
-
+    trie_set trie lookup_key new_value
 
   (* gets an element from the trie *)
   let rec trie_get trie key = 
@@ -74,14 +72,12 @@ module MakeTrie (Trie : TrieSig) = struct
     let lookup_key = to_list key in
     trie_get trie lookup_key
 
-
   (*let rec each cb trie =
     let Point(value, children) = trie in
     (match value with
     | None -> ()
     | Value v -> cb v);
     iter (fun (_, nt) -> each cb nt) children*)
-
 
   let map fn trie =
     let rec mapper fn trie acc_key =
@@ -93,12 +89,11 @@ module MakeTrie (Trie : TrieSig) = struct
       Point(mapped_value, mapped_children) in
     mapper fn trie []
 
-
   let from_list key_value_list = 
     let trie = empty () in
     let rec adder trie pairs = match pairs with
       | [] -> trie
-      | (k,v)::rest -> adder (add trie k v) rest in
+      | (k,v)::rest -> adder (set trie k v) rest in
     adder trie key_value_list
 end
 
@@ -135,6 +130,8 @@ let testGetSetStringTrie () =
   assert ((StringTrie.get trie "a") = 1);
   assert ((StringTrie.get trie "ab") = 2);
   assert ((StringTrie.get trie "c") = 3);
+  let new_trie = (StringTrie.set trie "c" 4) in
+  assert ((StringTrie.get new_trie "c") = 4);
   Printf.printf "All StringTrie get/set tests passed\n"
 
 let testMap () =
