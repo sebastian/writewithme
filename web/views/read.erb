@@ -1,0 +1,127 @@
+<!doctype html>
+<!--[if lt IE 7 ]><html class="ie ie6" lang="en"> <![endif]-->
+<!--[if IE 7 ]><html class="ie ie7" lang="en"> <![endif]-->
+<!--[if IE 8 ]><html class="ie ie8" lang="en"> <![endif]-->
+<!--[if (gte IE 9)|!(IE)]><!--><html lang="en"> <!--<![endif]-->
+<head>
+	<meta charset="utf-8" />
+	<title>WriteWithMe - Read my story</title>
+	<meta name="description" content="WriteWithMe is a creative writing tool for writing stories together with the internet">
+	<meta name="author" content="Kleio - Sebastian Probst Eide">
+
+  <!-- Le HTML5 shim, for IE6-8 support of HTML elements -->
+  <!--[if lt IE 9]>
+    <script src="http://html5shim.googlecode.com/svn/trunk/html5.js"></script>
+  <![endif]-->
+  
+  <link rel="stylesheet" href="/stylesheets/bootstrap-1.2.0.min.css">
+  <link rel="stylesheet" href="/stylesheets/custom.css" />
+
+	<!-- Mobile Specific Metas
+  ================================================== -->
+	<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" /> 
+	
+	<!-- Favicons
+	================================================== -->
+	<link rel="shortcut icon" href="images/favicon.ico">
+	<link rel="apple-touch-icon" href="images/apple-touch-icon.png">
+	<link rel="apple-touch-icon" sizes="72x72" href="images/apple-touch-icon-72x72.png" />
+	<link rel="apple-touch-icon" sizes="114x114" href="images/apple-touch-icon-114x114.png" />
+	
+</head>
+<body
+  <!-- Topbar
+  ================================================== -->
+  <div class="topbar">
+    <div class="topbar-inner">
+      <div class="container">
+        <h3><a href="#">WriteWithMe</a></h3>
+        <ul class="nav">
+          <li><a href="/">Write a story</a></li>
+          <li class="active"><a href="#story">An excellent story</a></li>
+          <li><a href="#overview">What is this?</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="container">
+ 
+    <!-- My story
+    ================================================== -->
+    <section id="story">
+      <div class="page-header">
+        <h1>The story <small>A heartwarming story written colaboratively with the internet </small></h1>
+      </div>
+      <div class="row">
+        <div class="span16 columns">
+          <div id="story">
+            <p id="story-paragraph">
+              Loading
+            </p>
+          </div>
+        </div>
+      </div><!-- /row -->
+    </section>
+
+    <!-- Testimonials
+    ================================================== -->
+    <section id="testimonials">
+      <div class="row">
+        <div class="span8 columns quote">
+          <blockquote>
+            <p>Reading the funny stories written with WriteWithMe is fun, but it just can't measure up to the exhilarating feeling of writing a story myself.
+            </p>
+            <small>The author</small>
+          </blockquote>
+        </div>
+        <div class="span8 columns quote">
+          <blockquote>
+            <p>I love WriteWithMe's creativity and ingenuity. Knowing she always keeps the story going, I can relax and write at my best.
+            </p>
+            <small>Anonymous internet user</small>
+          </blockquote>
+        </div>
+      </div><!-- /row -->
+    </section>
+
+    <!-- Overview
+    ================================================== -->
+    <section id="overview">
+      <div class="page-header">
+        <h3>WriteWithMe <small>What is it?</small></h3>
+      </div>
+      <div class="row">
+        <div class="span4 columns">
+          <h4>Write your own story</h4>
+          <a href="/" class="btn primary">Write my story</a>
+          <p>
+            You are the master of your own destiny. Click the button above to write your own story.
+          </p>
+        </div>
+        <div class="span6 columns">
+          <h4>What</h4>
+          <p>WriteWithMe is your digital writing partner. She has a somewhat abstract writing style, and loves creative writing. If at times you find it hard to see the connection between what she writes and what you previously had written, please rest assured that it is all part of the grand scheme of things that she has planned for your collective story.</p>
+        </div>
+        <div class="span6 columns">
+          <h4>How</h4>
+          <p>
+            WriteWithMe gets to write quite a bit on a day to day basis, so she lets you start and set the theme. Once you have written your first part, she will think for a while, and then write a bit herself. Afterwards you can write some more, and then, again she will contribute a part. At the end you will have a well written and entertaining piece of prose. Have fun.
+          </p>
+        </div>
+      </div><!-- /row -->
+    </section>
+    
+  </div>
+
+	<!-- JS
+	================================================== -->
+	<script src="//ajax.googleapis.com/ajax/libs/jquery/1.5.1/jquery.js"></script>
+	<script>window.jQuery || document.write("<script src='/javascripts/jquery-1.5.1.min.js'>\x3C/script>")</script>
+	<script src="/javascripts/underscore.js"></script>
+	<script src="/javascripts/json2.js"></script>
+  <script>window.storyId = "<%= @id %>"</script>
+	<script src="/javascripts/app.js"></script>
+	
+</body>
+</html>

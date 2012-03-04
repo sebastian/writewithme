@@ -1,0 +1,91 @@
+/* @override http://writewithme.dev/stylesheets/custom.css */
+
+body {
+	margin-top: 80px;
+}
+
+/* @group Words left */
+
+/*.words_left {
+	margin-bottom: 10px;
+	margin-top: -10px;
+	padding: 3px 0;
+	color: black;
+	background-color: #eee;
+}*/
+
+#my_story div.row div.span16.columns.words_left div.padding {
+	padding: 5px 5px 5px 10px;
+	color: gray;
+}
+
+
+
+/* @end */
+
+/* @group Cursor */
+
+div#story span#cursor {
+	display: inline-block;
+	width: 2px;
+	padding: 8px 0;
+	height: 20px;
+	margin-bottom: 7px;
+	margin-top: 8px;
+}
+
+span#cursor.blackCursor {
+	background-color: black;
+}
+
+span#thinking_cursor {
+	background-color: green;
+	color: white;
+	display: none;
+	height: 30px;
+	padding: 16px 6px 5px;
+}
+
+
+
+/* @end */
+
+.quote {
+	margin-top: 40px;
+}
+
+span.story-break {
+	display: block;
+	width: 100%;
+	font-size: 0;
+	padding: 0;
+	margin-right: 0;
+	margin-left: 0;
+	margin-bottom: 0;
+}
+
+/*div#story p span {
+	display: inline-block;
+	line-height: 1.3em;
+	padding: 8px 0;
+}*/
+
+section {
+	margin-top: 30px;
+}
+
+#story p {
+	font-size: 2em;
+	margin-top: 20px;
+}
+
+span.story-word {
+	line-height: 51px;
+	display: inline-block;
+	padding-left: 8px;
+}
+
+span.story-word.author-computer {	background-color: green;
+	color: white;
+
+}

@@ -1,0 +1,14 @@
+lib/*.sqlite
+web/texts
+.DS_Store
+**.sqlite
+*.*/.DS_Store
+backend/_build/*
+backend/_tags
+backend/Makefile
+backend/configure
+backend/myocamlbuild.ml
+backend/setup.data
+backend/setup.log
+backend/writewithme.byte
+backend/setup.ml

@@ -1,0 +1,13 @@
+OASISFormat: 0.2
+Name:        WriteWithMe
+Version:     0.0.1
+Synopsis:    Backend for the WriteWithMe colaborative writing tool
+Authors:     Sebastian Probst Eide
+License:     LGPL-2.1 with OCaml linking exception
+Plugins:     DevFiles (0.2)
+
+Executable writewithme
+  Path:         .
+  BuildTools:   ocamlbuild
+  MainIs:       writewithme.ml
+  BuildDepends:	str
