@@ -1,5 +1,8 @@
+open Lwt
+
 (****************************************************************
  * Type definitions *********************************************)
+
 exception No_next_word
 
 type word = string 
@@ -18,23 +21,26 @@ let print_string_list string_list =
   List.iter (fun s -> Printf.printf "--> %s\n" s) string_list
 
 let sentence_from_paragraph para =
-  let regexp = Str.regexp "[.?!] " in
+  let open Re_str in
+  let regexp = regexp "[.?!] " in
   let breaker = "...Next.Sentence..." in
-  Str.global_replace regexp ("\\0" ^ breaker) para
-  |> Str.split (Str.regexp (" " ^ breaker))
+  global_replace regexp ("\\0" ^ breaker) para
+  |> split (Re_str.regexp (" " ^ breaker))
 
 let para_from_text text =
-  let replace_regexp = Str.regexp "\n\n\n" in
-  let split_regexp = Str.regexp "\n\n" in
-  Str.global_replace replace_regexp "\n\n" text
-  |> Str.split split_regexp
+  let open Re_str in
+  let replace_regexp = regexp "\n\n\n" in
+  let split_regexp = regexp "\n\n" in
+  let double_broken_text = global_replace replace_regexp "\n\n" text in
+  split split_regexp double_broken_text
 
 let words_list_from_text sentence = 
-  let regexp = Str.regexp "[.?!]" in
-  let updated_sentence = Str.global_replace regexp " \\0" sentence in
-  Str.split (Str.regexp " ") updated_sentence
+  let open Re_str in
+  let regexp = regexp "[.?!]" in
+  let updated_sentence = global_replace regexp " \\0" sentence in
+  split (Re_str.regexp " ") updated_sentence
   |> List.filter (fun w -> w <> "")
-  |> List.map (fun w -> Str.global_replace (Str.regexp "\n") "" w)
+  |> List.map (fun w -> global_replace (Re_str.regexp "\n") "" w)
 
 let rec print_strs = function
   | [] -> ()
@@ -56,8 +62,9 @@ let rec take n words =
   | [] -> []
   | w :: ws -> w :: (take (n-1) ws)
 
-let take_random_el_from_list el_list =
-  List.nth el_list (Random.int (List.length el_list))
+let take_random_el_from_list = function
+  | [] -> raise No_next_word
+  | next_words -> List.nth next_words (Random.int (List.length next_words))
 
 
 (****************************************************************
@@ -113,8 +120,8 @@ let train text =
 let rec get_next_word bank words =
   match words with
   | [] -> 
-      let WordBank(_trie, words, _count) = bank in
-      take_random_el_from_list words
+      let WordBank(_trie, next_words, _count) = bank in
+      take_random_el_from_list next_words
   | w::ws -> 
       let WordBank(trie, _words, _count) = bank in
       let next_bank = Trie.StringTrie.get trie w in
@@ -125,24 +132,91 @@ let predict_next_word words =
   let rec get_words = function
     | [] -> raise No_next_word
     | w::ws ->
-        try get_next_word !root_bank (w::ws)
+        try get_next_word (!root_bank) (w::ws)
         with Not_found -> get_words ws in
   let checkable_words = rev (take (Config.word_depth - 1) (rev words))
   in
   get_words checkable_words
 
 let predict_next n text =
-  let rec get_n_words n words = match n with
+  let rec get_n_words n words = 
+    match n with
     | 0 -> []
     | _ -> begin
-        let next_word = predict_next_word words in
-        let new_words = words @ [next_word] in
-        next_word :: (get_n_words (n-1) new_words)
+        try 
+          let next_word = predict_next_word words in
+          let new_words = words @ [next_word] in
+          next_word :: (get_n_words (n-1) new_words)
+        with No_next_word -> []
     end
   in
   let words_as_list = words_list_from_text text in
   let predicted_words = get_n_words n words_as_list in
   String.concat " " predicted_words
+
+
+(****************************************************************
+ * Runner *******************************************************)
+
+let backlog = 15
+
+let try_close chan =
+  catch (fun () -> Lwt_io.close chan)
+  (function |_ -> return ())
+
+let init_socket sockaddr = let suck = Lwt_unix.socket Unix.PF_INET Unix.SOCK_STREAM 0 in
+  Lwt_unix.setsockopt suck Unix.SO_REUSEADDR true;
+  Lwt_unix.bind suck sockaddr;
+  Lwt_unix.listen suck backlog;
+  suck
+
+let process_accept ~sockaddr ~timeout callback (client,_) =
+  (* client is now connected *)
+  let inchan = Lwt_io.of_fd Lwt_io.input client in
+  let outchan = Lwt_io.of_fd Lwt_io.output client in
+  let clisockaddr = Unix.getpeername (Lwt_unix.unix_file_descr client) in
+  let srvsockaddr = Unix.getsockname (Lwt_unix.unix_file_descr client) in
+  let c = callback ~clisockaddr ~srvsockaddr inchan outchan in
+  let events = match timeout with
+    | None -> [c]
+    | Some t -> [c; (Lwt_unix.sleep (float_of_int t) >> return ()) ] in
+  Lwt.pick events >> try_close outchan >> try_close inchan
+  
+let simple ~sockaddr ~timeout callback =
+  let suck = init_socket sockaddr in
+  let rec handle_connection () =
+     lwt x = Lwt_unix.accept suck in
+     let _ =  process_accept ~sockaddr ~timeout callback x in
+     handle_connection ()
+  in
+  handle_connection ()
+
+let trainer ~clisockaddr ~srvsockaddr inchan outchan =
+  let open Printf in
+  lwt text = Lwt_io.read_line inchan in
+  Printf.printf "Got some text for training :)\n%!";
+  train text;
+  Lwt_io.write outchan ""
+
+let actuator ~clisockaddr ~srvsockaddr inchan outchan =
+  let open Printf in
+  lwt text = Lwt_io.read_line inchan in
+  train text;
+  let next = (predict_next 10 text) in
+  eprintf "Got: '%s'. Predicting: %s\n%!" text next;
+  Lwt_io.write outchan next
+  
+let _ =
+  let inet_addr = Unix.inet_addr_of_string "0.0.0.0" in
+  let sockaddr_train = Lwt_unix.ADDR_INET(inet_addr, 5678) in
+  let sockaddr_predict = Lwt_unix.ADDR_INET(inet_addr, 6789) in
+  let timeout = None in
+  let daemon_t = join [ 
+    simple ~sockaddr:sockaddr_predict ~timeout actuator;
+    simple ~sockaddr:sockaddr_train ~timeout trainer 
+  ]
+  in
+  Lwt_main.run daemon_t
 
 
 (****************************************************************
@@ -205,6 +279,3 @@ let test () =
 let runAllTests () = 
   Trie.test ();
   test ()
-
-let _ = 
-  runAllTests ();

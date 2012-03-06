@@ -5,9 +5,11 @@ Synopsis:    Backend for the WriteWithMe colaborative writing tool
 Authors:     Sebastian Probst Eide
 License:     LGPL-2.1 with OCaml linking exception
 Plugins:     DevFiles (0.2)
+BuildTools:  ocamlbuild
 
 Executable writewithme
-  Path:         .
-  BuildTools:   ocamlbuild
-  MainIs:       writewithme.ml
-  BuildDepends:	str
+  Path:             .
+  BuildTools:       ocamlbuild
+  MainIs:           writewithme.ml
+  CompiledObject:   best
+  BuildDepends:	    lwt.syntax, lwt, lwt.unix, re, re.str
