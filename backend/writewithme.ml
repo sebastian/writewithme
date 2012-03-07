@@ -42,10 +42,6 @@ let words_list_from_text sentence =
   |> List.filter (fun w -> w <> "")
   |> List.map (fun w -> global_replace (Re_str.regexp "\n") "" w)
 
-let rec print_strs = function
-  | [] -> ()
-  | s::ss -> Printf.printf "'%s'\n" s; print_strs ss
-
 let rec break_into_word_segments word_input n = match word_input with
   | [] -> []
   | _::words -> begin
@@ -110,11 +106,7 @@ let rec update_along_path bank sequence =
 
 let update_for_sequence sequence =
   break_into_word_segments sequence Config.word_depth
-  |> List.iter (fun words -> 
-    Printf.printf "Training for words:\n";
-    print_string_list words;
-    root_bank := update_along_path !root_bank words
-  )
+  |> List.iter (fun words -> root_bank := update_along_path !root_bank words)
 
 let train text = 
   let paras = para_from_text text in
@@ -126,12 +118,9 @@ let rec get_next_word bank words =
   | [] -> begin
       let WordBank(_trie, next_words, _count) = bank in
       try (take_random_el_from_list next_words)
-      with No_next_word -> 
-        Printf.printf "Couldn't find a next word\n%!";
-        raise Not_found
+      with No_next_word -> raise Not_found
   end
   | w::ws -> 
-      Printf.printf "Getting bank for word %s\n%!" w;
       let WordBank(trie, _words, _count) = bank in
       let next_bank = Trie.StringTrie.get trie w in
       get_next_word next_bank ws
