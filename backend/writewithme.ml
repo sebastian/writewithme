@@ -36,7 +36,7 @@ let para_from_text text =
 
 let words_list_from_text sentence = 
   let open Re_str in
-  let regexp = regexp "[.?!]" in
+  let regexp = regexp "[.?!,]" in
   let updated_sentence = global_replace regexp " \\0" sentence in
   split (Re_str.regexp " ") updated_sentence
   |> List.filter (fun w -> w <> "")
@@ -110,7 +110,11 @@ let rec update_along_path bank sequence =
 
 let update_for_sequence sequence =
   break_into_word_segments sequence Config.word_depth
-  |> List.iter (fun words -> root_bank := update_along_path !root_bank words)
+  |> List.iter (fun words -> 
+    Printf.printf "Training for words:\n";
+    print_string_list words;
+    root_bank := update_along_path !root_bank words
+  )
 
 let train text = 
   let paras = para_from_text text in
@@ -119,10 +123,15 @@ let train text =
 
 let rec get_next_word bank words =
   match words with
-  | [] -> 
+  | [] -> begin
       let WordBank(_trie, next_words, _count) = bank in
-      take_random_el_from_list next_words
+      try (take_random_el_from_list next_words)
+      with No_next_word -> 
+        Printf.printf "Couldn't find a next word\n%!";
+        raise Not_found
+  end
   | w::ws -> 
+      Printf.printf "Getting bank for word %s\n%!" w;
       let WordBank(trie, _words, _count) = bank in
       let next_bank = Trie.StringTrie.get trie w in
       get_next_word next_bank ws
