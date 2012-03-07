@@ -123,7 +123,8 @@ module StringTrieFunctionality = struct
     let rec make_list key count acc = match count with
       | 0 -> key.[0] :: acc
       | n -> make_list key (count-1) (key.[n] :: acc) in
-    make_list key ((String.length key) - 1) []
+    let open String in
+    make_list (lowercase key) ((length key) - 1) []
 
   let from_list key_elems = 
     let rec make_string str c_list n =
