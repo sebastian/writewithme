@@ -20,13 +20,6 @@ let (|>) a b = b a
 let print_string_list string_list = 
   List.iter (fun s -> Printf.printf "--> %s\n" s) string_list
 
-let sentence_from_paragraph para =
-  let open Re_str in
-  let regexp = regexp "[.?!] " in
-  let breaker = "...Next.Sentence..." in
-  global_replace regexp ("\\0" ^ breaker) para
-  |> split (Re_str.regexp (" " ^ breaker))
-
 let para_from_text text =
   let open Re_str in
   let replace_regexp = regexp "\n\n\n" in
@@ -61,6 +54,43 @@ let rec take n words =
 let take_random_el_from_list = function
   | [] -> raise No_next_word
   | next_words -> List.nth next_words (Random.int (List.length next_words))
+
+let remove_unwanted_whitespace text =
+  let open Re_str in
+  let regexp = regexp " \([.?!,]\)" in
+  global_replace regexp "\\1" text
+
+let rec trim_and_capitalize text =
+  let open String in
+  match text.[0] with
+  | ' ' -> trim_and_capitalize (sub text 1 ((length text) - 1))
+  | _ -> String.capitalize text
+
+let capitalize clean delim text =
+  let open Re_str in
+  split (regexp delim) text
+  |> List.map (fun s -> trim_and_capitalize s)
+  |> String.concat (clean ^ " ")
+
+let make_sensible_cases text =
+  text
+  |> capitalize "." "\."
+  |> capitalize "?" "\?"
+  |> capitalize "!" "!"
+  |> String.uncapitalize
+
+let strip_quotes text =
+  let open Re_str in
+  let rxp = regexp "[\"'`]" in
+  let rxp_spaces = regexp "  " in
+  global_replace rxp "" text
+  |> global_replace rxp_spaces " "
+
+let beautify_text text =
+  text
+  |> remove_unwanted_whitespace
+  |> make_sensible_cases
+  |> strip_quotes
 
 
 (****************************************************************
@@ -192,17 +222,19 @@ let simple ~sockaddr ~timeout callback =
 let trainer ~clisockaddr ~srvsockaddr inchan outchan =
   let open Printf in
   lwt text = Lwt_io.read_line inchan in
-  Printf.printf "Got some text for training :)\n%!";
-  train text;
+  let beautified_text = beautify_text text in
+  train beautified_text;
   Lwt_io.write outchan ""
 
 let actuator ~clisockaddr ~srvsockaddr inchan outchan =
   let open Printf in
   lwt text = Lwt_io.read_line inchan in
-  train text;
+  let beautified_text = beautify_text text in
+  train beautified_text;
   let next = (predict_next 10 text) in
-  eprintf "Got: '%s'. Predicting: %s\n%!" text next;
-  Lwt_io.write outchan next
+  let beautified_next = beautify_text next in
+  eprintf "Got: '%s'. Predicting: %s\n%!" beautified_text beautified_next;
+  Lwt_io.write outchan beautified_next
   
 let _ =
   let inet_addr = Unix.inet_addr_of_string "0.0.0.0" in
@@ -223,17 +255,13 @@ let _ =
 let testTextTransformations () =
   let text = "This is a long text. With sentences.\n\n\nWhat comes next?" in
   let para = "This is a sentence. What comes next? This is what, and this is next." in
-  let sentence = "This is a     sentence." in
   (* Exercise functions *)
-  let paras = (para_from_text text) in
-  let sentences = sentence_from_paragraph para in
-  let words = (words_list_from_text sentence) in
+  let p::paras = (para_from_text text) in
+  let words = (words_list_from_text p) in
   (* Run assertions *)
   (* It screws up on smileys etc, but that will have to be ok *)
-  assert (paras = ["This is a long text. With sentences.";"What comes next?"]);
-  assert (sentences = ["This is a sentence.";
-      "What comes next?";"This is what, and this is next."]);
-  assert (words = ["This";"is";"a";"sentence";"."])
+  assert (p::paras = ["This is a long text. With sentences.";"What comes next?"]);
+  assert (words = ["This";"is";"a";"long";"text";".";"With";"sentences";"."])
 
 let testBreakWordsIntoInsertableElements () =
   let words = (words_list_from_text "hello kjaere mennesker") in
@@ -268,12 +296,51 @@ let testTrainPredictNextWord () =
   assert (next_words = "is best");
   Printf.printf "PredictNextWord test passed.\n%!"
 
+let testRemoveWhiteSpace () =
+  let bad_text = "hello . there , what ?" in
+  let good_text = remove_unwanted_whitespace bad_text in
+  assert (good_text = "hello. there, what?")
+
+let testMakeSensibleCases () =
+  let bad_text = "hello, there. what? is! this" in
+  let good_text = make_sensible_cases bad_text in
+  assert (good_text = "hello, there. What? Is! This")
+
+let testTrimAndCapitalize () =
+  let bad_text = "   a" in
+  let good_text = trim_and_capitalize bad_text in
+  assert (good_text = "A");
+  let bad_text = "   sebastian" in
+  let good_text = trim_and_capitalize bad_text in
+  assert (good_text = "Sebastian")
+
+let testRemoveQuotes () =
+  let bad_text = "this \" is ' my ` text" in
+  let good_text = strip_quotes bad_text in
+  assert (good_text = "this is my text")
+
+let testBeautifyText () =
+  (* FIXME: ? It removes special characters from the end 
+   * of lines. Maybe that is actually a feature rather
+   * than a bug :) *)
+  let bad_text = "   a ? what \" the fack . is this" in
+  let good_text = beautify_text bad_text in
+  assert (good_text = "a? What the fack. Is this")
+
 let test () =
   testTextTransformations ();
   testBreakWordsIntoInsertableElements ();
   testUpdateAlongPath ();
-  testTrainPredictNextWord ()
+  testTrainPredictNextWord ();
+  testRemoveWhiteSpace ();
+  testMakeSensibleCases ();
+  testTrimAndCapitalize ();
+  testRemoveQuotes ();
+  testBeautifyText ()
 
 let runAllTests () = 
   Trie.test ();
   test ()
+
+(* let _ = *)
+(*   runAllTests () *)
