@@ -1,1 +1,1 @@
-let word_depth = 6;
+let word_depth = 5;

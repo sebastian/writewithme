@@ -128,28 +128,45 @@ let most_popular_words trie =
   let words = Trie.StringTrie.fold fold_fn [] trie in
   map (fun (_, word) -> word) words
 
-let rec update_along_path bank sequence = 
+let rec update_along_path bank sequence ?find_next:(find_next=false) () = 
   match sequence with
   | [] -> bank
   | w::ws -> 
-      let WordBank(trie, _words, count) = bank in
+      let WordBank(trie, words, count) = bank in
       let next_bank = begin
         try Trie.StringTrie.get trie w
         with Not_found -> empty ()
       end in
-      let new_bank = update_along_path next_bank ws in
+      let new_bank = update_along_path next_bank ws ~find_next () in
       let new_trie = Trie.StringTrie.set trie w new_bank in
-      let new_words = most_popular_words new_trie in
+      let new_words = match find_next with
+      | true -> most_popular_words new_trie
+      | false -> words in
       WordBank(new_trie, new_words, count + 1)
 
-let update_for_sequence sequence =
+let update_for_sequence sequence ~batch =
   break_into_word_segments sequence Config.word_depth
-  |> List.iter (fun words -> root_bank := update_along_path !root_bank words)
+  |> List.iter (fun words -> root_bank := update_along_path !root_bank words ~find_next:batch ())
 
 let train text = 
   let paras = para_from_text text in
   let material = List.fold_left (fun a p -> (words_list_from_text p) :: a) [] paras in
-  List.iter (fun s -> update_for_sequence s) material
+  List.iter (fun s -> update_for_sequence s ~batch:false) material
+
+let batch_train text = 
+  let paras = para_from_text text in
+  let material = List.fold_left (fun a p -> (words_list_from_text p) :: a) [] paras in
+  List.iter (fun s -> update_for_sequence s ~batch:true) material
+
+let rec compute_best_next_for_trie bank =
+  let map_best (_word, bank) = compute_best_next_for_trie bank in
+  let WordBank(trie, _words, count) = bank in
+  let new_trie = Trie.StringTrie.map map_best trie in
+  let new_words = most_popular_words new_trie in
+  WordBank(new_trie, new_words, count)
+
+let end_batch_training () =
+  root_bank := compute_best_next_for_trie !root_bank
 
 let rec get_next_word bank words =
   match words with
@@ -230,9 +247,17 @@ let simple ~sockaddr ~timeout callback =
 let trainer ~clisockaddr ~srvsockaddr inchan outchan =
   let open Printf in
   lwt text = Lwt_io.read_line inchan in
-  let beautified_text = beautify_text text in
-  train beautified_text;
-  Lwt_io.write outchan ""
+  match text with 
+  | "done" -> begin
+      eprintf "Received 'done' from client. Will end batch mode\n%!";
+      end_batch_training ();
+      Lwt_io.write outchan "Thanks!"
+  end
+  | _ -> begin
+      let beautified_text = beautify_text text in
+      batch_train beautified_text;
+      Lwt_io.write outchan ""
+  end
 
 let actuator ~clisockaddr ~srvsockaddr inchan outchan =
   let open Printf in
@@ -284,12 +309,12 @@ let testBreakWordsIntoInsertableElements () =
 
 let testUpdateAlongPath () =
   let text = ["text"] in
-  let new_bank = update_along_path (empty ()) text in
+  let new_bank = update_along_path (empty ()) text () in
   let WordBank(_, words, count) = new_bank in
   assert (words = ["text"]);
   assert (count = 1);
   let more_text = ["text";"more"] in
-  let newer_bank = update_along_path new_bank more_text in
+  let newer_bank = update_along_path new_bank more_text () in
   let WordBank(_, words, count) = newer_bank in
   assert (words = ["text"]);
   assert (count = 2);
