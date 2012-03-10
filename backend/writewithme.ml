@@ -109,16 +109,24 @@ let reset_bank () = root_bank := (empty ())
  *)
 let most_popular_words trie =
   let open List in
-  let bank_list = Trie.StringTrie.to_list trie in
-  let word_fn = fun (word, WordBank(_trie, _words, count)) -> (word, count) in
-  let word_list = map word_fn bank_list in
-  let sort_fn = fun (_w1, c1) (_w2, c2) -> 
-    if c1 = c2 then 0 else
-    if c1 > c2 then 1 else -1
+  let rec drop_smallest smallest words =
+    let (sc, sw) = smallest in
+    match words with
+    | [] -> []
+    | w::ws -> begin
+        let (c, _word) = w in
+        if c < sc then smallest :: (drop_smallest w ws)
+        else w :: (drop_smallest smallest ws)
+    end
   in
-  let sorted_word_tuples = sort sort_fn word_list in
-  let top_word_tuples = take 2 sorted_word_tuples in
-  map (fun (word, _count) -> word) top_word_tuples
+  let fold_fn acc e = 
+    let (word, WordBank(_trie, _words, count)) = e in
+    match (length acc) with
+    | 3 -> drop_smallest (count, word) acc
+    | _ -> (count, word) :: acc
+  in
+  let words = Trie.StringTrie.fold fold_fn [] trie in
+  map (fun (_, word) -> word) words
 
 let rec update_along_path bank sequence = 
   match sequence with
